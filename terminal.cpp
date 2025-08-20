@@ -11,6 +11,123 @@ vector<string> customCommands = {"ff"};
 
 // Custom commands
 
+void testNet() {
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+
+    vector<string> sites = {
+        "google.com",
+        "yahoo.com",
+        "example.com",
+        "wikipedia.org",
+        "bing.com",
+        "duckduckgo.com"
+    };
+
+    for (const auto &site : sites) {
+        string cmd = "ping -n 1 " + site;
+        FILE* pipe = _popen(cmd.c_str(), "r");
+        if (!pipe) {
+            SetConsoleTextAttribute(hConsole, 12);
+            cout << "error pinging site: " << site << endl;
+            SetConsoleTextAttribute(hConsole, 7);
+            continue;
+        }
+
+        char buffer[128];
+        bool success = false;
+        while (fgets(buffer, sizeof(buffer), pipe)) {
+            string line(buffer);
+            if (line.find("TTL=") != string::npos) {
+                success = true;
+                break;
+            }
+        }
+
+        _pclose(pipe);
+
+        if (success) {
+            SetConsoleTextAttribute(hConsole, 10);
+            cout << site << " is reachable!" << endl;
+        } else {
+            SetConsoleTextAttribute(hConsole, 12);
+            cout << "error pinging site: " << site << endl;
+        }
+        SetConsoleTextAttribute(hConsole, 7);
+    }
+}
+
+void findInFile(const string &filename, const string &search) {
+    ifstream file(filename);
+    if (!file.is_open()) {
+        cerr << "Could not open " << filename << endl;
+        return;
+    }
+
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    string line;
+    int lineNumber = 1;
+
+    while (getline(file, line)) {
+        size_t pos = 0;
+        bool found = false;
+        while ((pos = line.find(search, pos)) != string::npos) {
+            found = true;
+            cout << filename << ":" << lineNumber << ">";
+            cout << line.substr(0, pos);
+
+            SetConsoleTextAttribute(hConsole, 14);
+            cout << search;
+
+            SetConsoleTextAttribute(hConsole, 7);
+            cout << line.substr(pos + search.length()) << endl;
+
+            pos += search.length();
+        }
+        if (!found) lineNumber++;
+        else lineNumber++;
+    }
+}
+
+uint64_t getFileOrFolderSize(const string &path) {
+    WIN32_FIND_DATAA fd;
+    HANDLE hFind = INVALID_HANDLE_VALUE;
+    uint64_t totalSize = 0;
+
+    string searchPath = path + "\\*";
+
+    hFind = FindFirstFileA(searchPath.c_str(), &fd);
+    if (hFind == INVALID_HANDLE_VALUE) {
+        WIN32_FILE_ATTRIBUTE_DATA fileInfo;
+        if (GetFileAttributesExA(path.c_str(), GetFileExInfoStandard, &fileInfo)) {
+            LARGE_INTEGER size;
+            size.LowPart = fileInfo.nFileSizeLow;
+            size.HighPart = fileInfo.nFileSizeHigh;
+            return size.QuadPart;
+        }
+        cerr << "Cannot access: " << path << endl;
+        return 0;
+    }
+
+    do {
+        string name = fd.cFileName;
+        if (name == "." || name == "..") continue;
+
+        string fullPath = path + "\\" + name;
+
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            totalSize += getFileOrFolderSize(fullPath);
+        } else {
+            LARGE_INTEGER size;
+            size.LowPart = fd.nFileSizeLow;
+            size.HighPart = fd.nFileSizeHigh;
+            totalSize += size.QuadPart;
+        }
+    } while (FindNextFileA(hFind, &fd) != 0);
+
+    FindClose(hFind);
+    return totalSize;
+}
+
 void findFilesAndFolders(const string& searchTerm) {
     WIN32_FIND_DATAA fd;
     HANDLE hFind = FindFirstFileA("*", &fd);
@@ -231,12 +348,15 @@ void runMCH(const string &file) {
         if (line.empty()) continue;
         if (line.substr(0, 3) == "ff ") {
             findFilesAndFolders(line.substr(3));
-        } else if (line.substr(0, 3) == "cd ") {
+        } 
+        else if (line.substr(0, 3) == "cd ") {
             changeDirectory(line.substr(3));
-        } else {
-            system(line.c_str());
-        }
+        } 
+        else if (line == "clear") {
+            system("cls");
+        } 
     }
+    mch.close();
 }
 
 void runAutoexec() {
@@ -277,8 +397,36 @@ int main() {
             continue;
         }
 
+        if (command.substr(0, 5) == "size ") {
+            string path = command.substr(5);
+            uint64_t size = getFileOrFolderSize(path);
+            cout << "Size of \"" << path << "\": " << size << " bytes" << endl;
+            continue;
+        }
+
+        if (command.substr(0, 5) == "find ") {
+            string rest = command.substr(5);
+            size_t spacePos = rest.find(' ');
+            if (spacePos != string::npos) {
+                string filename = rest.substr(0, spacePos);
+                string search = rest.substr(spacePos + 1);
+                findInFile(filename, search);
+            }
+            continue;
+        }
+
         if (command.substr(0, 5) == "smch ") {
             runMCH(command.substr(5));
+            continue;
+        }
+
+        if (command == "testnet") {
+            testNet();
+            continue;
+        }
+
+        if (command == "pwd") {
+            cout << "Current path is: " << getPath() << endl; 
             continue;
         }
 
