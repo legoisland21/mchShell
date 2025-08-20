@@ -3,10 +3,60 @@
 #include <sstream>
 #include <vector>
 #include <algorithm>
-#include <map>
 using namespace std;
 
-vector<string> blockedCommands = {"help"};
+vector<string> blockedCommands = {"help", "ff"};
+vector<string> customCommands = {"ff"};
+
+// Custom commands
+
+void findFilesAndFolders(const string& pattern) {
+    WIN32_FIND_DATAA findData;
+    HANDLE hFind;
+
+    vector<string> files;
+    vector<string> folders;
+
+    string searchPattern = "*";
+    hFind = FindFirstFileA(searchPattern.c_str(), &findData);
+
+    if (hFind == INVALID_HANDLE_VALUE) {
+        cout << "No files/folders found" << endl;
+        return;
+    }
+
+    do {
+        string name = findData.cFileName;
+
+        if (name == "." || name == "..") continue;
+
+        if (name.find(pattern) != string::npos) {
+            if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+                folders.push_back(name);
+            else
+                files.push_back(name);
+        }
+    } while (FindNextFileA(hFind, &findData));
+
+    FindClose(hFind);
+
+    if (files.empty() && folders.empty()) {
+        cout << "No files/folders found" << endl;
+        return;
+    }
+
+    if (!files.empty()) {
+        cout << "FILES:\n";
+        for (auto& f : files) cout << f << " ";
+        cout << endl;
+    }
+
+    if (!folders.empty()) {
+        cout << "FOLDERS:\n";
+        for (auto& d : folders) cout << d << " ";
+        cout << endl;
+    }
+}
 
 // Environment Variable handler
 
@@ -134,7 +184,7 @@ bool isInPath(const string &program) {
 
 // Misc
 
-bool checkApp(string& command) { return find(blockedCommands.begin(), blockedCommands.end(), command) == blockedCommands.end(); }
+bool checkApp(const string& command, const vector<string>& names) { return find(names.begin(), names.end(), command) == names.end(); }
 
 // Get PC Info
 
@@ -171,7 +221,17 @@ void setColor(WORD color) {
     SetConsoleTextAttribute(hConsole, color);
 }
 
+// IO
+
+void enableTabCompletion() {
+    HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD mode;
+    GetConsoleMode(hStdin, &mode);
+    SetConsoleMode(hStdin, mode | ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_EXTENDED_FLAGS);
+}
+
 int main() {
+    enableTabCompletion();
     string command;
     setColor(FOREGROUND_BLUE | FOREGROUND_INTENSITY);
     printSplash();
@@ -186,28 +246,36 @@ int main() {
 
         getline(cin, command);
 
+        if (command.substr(0, 3) == "ff ") {
+            string name = command.substr(3);
+            findFilesAndFolders(name);
+            continue;
+        }
+
+        if (command == "cd..") command = "cd ..";
+
         if (command.substr(0, 3) == "cd ") {
             string newDir = command.substr(3);
             changeDirectory(newDir);
-        } else if (command == "exit") {
-            cout << "Goodbye!" << endl;
-            break;
+            continue;
+        } 
+
+        if (command == "exit") break;
+
+        if (!checkApp(command, blockedCommands)) {
+            system(command.c_str());
+            cout << endl;
+            continue;
         }
 
-        if(fileExistsWOX(command) && checkApp(command)) {
-            string params;
-            params = outputParams(command);
-            command = outputApp(command);
+        string app = outputApp(command);
+        string params = outputParams(command);
 
-            if(!openProcess(command, params)) cerr << "Error opening app" << endl;
-        } else if(isInPath(command) && checkApp(command) && fileExistsWOX(command)) {
-            string params;
-            params = outputParams(command);
-            command = outputApp(command);
-            
-            if(!openProcess(command, params)) cerr << "Error opening app" << endl;
+        if ((fileExistsWOX(app) && checkApp(app, blockedCommands)) || (isInPath(app) && checkApp(app, blockedCommands) && fileExistsWOX(app))) {
+            if(!openProcess(app, params)) cerr << "Error opening app" << endl;
         }
-        else if(command.substr(0, 3) != "cd ") system(command.c_str());
+        else system(command.c_str());
+
         cout << endl;
     }
 }

@@ -17,6 +17,7 @@ mchShell is a tiny wrapper for CMD made with the Windows API
 - **Full CMD Compatibility**: All Windows commands work seamlessly (some commands may launch in separate windows - please report any issues)
 - **Environment Variable Support**: `cd %USERPROFILE%`, `cd %TEMP%`, etc.
 - **Lightweight**: Minimal overhead over native CMD
+- **Commands**: Custom `ff` command to find files/folders
 
 ## Compilation
 
