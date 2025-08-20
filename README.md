@@ -12,12 +12,12 @@ mchShell is a tiny wrapper for CMD made with the Windows API
 3. Have fun using mchShell!
 
 ## Features
-
-- **Unix-style Interface**: Beautiful ASCII art and prompt styling
 - **Full CMD Compatibility**: All Windows commands work seamlessly (some commands may launch in separate windows - please report any issues)
 - **Environment Variable Support**: `cd %USERPROFILE%`, `cd %TEMP%`, etc.
 - **Lightweight**: Minimal overhead over native CMD
 - **Commands**: Custom `ff` command to find files/folders
+- **AutoExec**: Custom `autoexec.mch` file with instructions (like .bat)
+- **MCH format**: 'Custom' executable format launchable with smch (.bat undercover)
 
 ## Compilation
 

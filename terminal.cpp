@@ -3,6 +3,7 @@
 #include <sstream>
 #include <vector>
 #include <algorithm>
+#include <fstream>
 using namespace std;
 
 vector<string> blockedCommands = {"help", "ff"};
@@ -217,17 +218,41 @@ void setColor(WORD color) {
     SetConsoleTextAttribute(hConsole, color);
 }
 
-// IO
+// MCH
 
-void enableTabCompletion() {
-    HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
-    DWORD mode;
-    GetConsoleMode(hStdin, &mode);
-    SetConsoleMode(hStdin, mode | ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_EXTENDED_FLAGS);
+void runMCH(const string &file) {
+    ifstream mch(file);
+    if (!mch.is_open()) {
+        cerr << "Could not open " << file << endl;
+        return;
+    }
+
+    string line;
+    while (getline(mch, line)) {
+        if (line.empty()) continue;
+        if (line.substr(0, 3) == "ff ") {
+            findFilesAndFolders(line.substr(3));
+        } else if (line.substr(0, 3) == "cd ") {
+            changeDirectory(line.substr(3));
+        } else {
+            system(line.c_str());
+        }
+    }
+}
+
+void runAutoexec() {
+    ifstream autoexec("autoexec.mch");
+    if(!autoexec.is_open()) return;
+
+    string line;
+    while(getline(autoexec, line)) {
+        if(line.empty() || line[0] == '#') continue;
+        system(line.c_str());
+    }
 }
 
 int main() {
-    enableTabCompletion();
+    runAutoexec();
     string command;
     setColor(FOREGROUND_BLUE | FOREGROUND_INTENSITY);
     printSplash();
@@ -242,6 +267,8 @@ int main() {
 
         getline(cin, command);
 
+        if (command == "exit") break;
+
         if (command.substr(0, 3) == "ff ") {
             string name = command.substr(3);
             findFilesAndFolders(name);
@@ -254,9 +281,12 @@ int main() {
             string newDir = command.substr(3);
             changeDirectory(newDir);
             continue;
-        } 
+        }
 
-        if (command == "exit") break;
+        if (command.substr(0, 5) == "smch ") {
+            runMCH(command.substr(5));
+            continue;
+        }
 
         if (!checkApp(command, blockedCommands)) {
             system(command.c_str());
