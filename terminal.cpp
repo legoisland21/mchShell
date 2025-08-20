@@ -27,8 +27,7 @@ void findFilesAndFolders(const string& searchTerm) {
         string name = fd.cFileName;
 
         if (name == "." || name == "..") continue;
-
-        // only match beginning
+        
         if (name.substr(0, searchTerm.size()) == searchTerm) {
             if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                 folders.push_back(name);
@@ -241,14 +240,9 @@ void runMCH(const string &file) {
 }
 
 void runAutoexec() {
-    ifstream autoexec("autoexec.mch");
-    if(!autoexec.is_open()) return;
-
-    string line;
-    while(getline(autoexec, line)) {
-        if(line.empty() || line[0] == '#') continue;
-        system(line.c_str());
-    }
+    ifstream f("autoexec.mch");
+    if(f.is_open()) runMCH("autoexec.mch");
+    else return;
 }
 
 int main() {
