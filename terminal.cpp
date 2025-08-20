@@ -10,52 +10,48 @@ vector<string> customCommands = {"ff"};
 
 // Custom commands
 
-void findFilesAndFolders(const string& pattern) {
-    WIN32_FIND_DATAA findData;
-    HANDLE hFind;
+void findFilesAndFolders(const string& searchTerm) {
+    WIN32_FIND_DATAA fd;
+    HANDLE hFind = FindFirstFileA("*", &fd);
+
+    if (hFind == INVALID_HANDLE_VALUE) {
+        cout << "Nothing found" << endl;
+        return;
+    }
 
     vector<string> files;
     vector<string> folders;
 
-    string searchPattern = "*";
-    hFind = FindFirstFileA(searchPattern.c_str(), &findData);
-
-    if (hFind == INVALID_HANDLE_VALUE) {
-        cout << "No files/folders found" << endl;
-        return;
-    }
-
     do {
-        string name = findData.cFileName;
+        string name = fd.cFileName;
 
         if (name == "." || name == "..") continue;
 
-        if (name.find(pattern) != string::npos) {
-            if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+        // only match beginning
+        if (name.substr(0, searchTerm.size()) == searchTerm) {
+            if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                 folders.push_back(name);
             else
                 files.push_back(name);
         }
-    } while (FindNextFileA(hFind, &findData));
+    } while (FindNextFileA(hFind, &fd));
 
     FindClose(hFind);
 
-    if (files.empty() && folders.empty()) {
-        cout << "No files/folders found" << endl;
-        return;
-    }
-
     if (!files.empty()) {
-        cout << "FILES:\n";
-        for (auto& f : files) cout << f << " ";
+        cout << "FILES:" << endl;
+        for (auto &f : files) cout << f << " ";
         cout << endl;
     }
 
     if (!folders.empty()) {
-        cout << "FOLDERS:\n";
-        for (auto& d : folders) cout << d << " ";
+        cout << "FOLDERS:" << endl;
+        for (auto &d : folders) cout << d << " ";
         cout << endl;
     }
+
+    if (files.empty() && folders.empty())
+        cout << "No files/folders found" << endl;
 }
 
 // Environment Variable handler
