@@ -16,7 +16,7 @@ mchShell is a tiny wrapper for CMD made with the Windows API
 - **Environment Variable Support**: `cd %USERPROFILE%`, `cd %TEMP%`, etc.
 - **Lightweight**: Minimal overhead over native CMD
 - **Commands**: Custom `ff` command to find files/folders, `pwd` that displays the current directory, `find` which takes a file and a string and outputs anytime the string was spotted
-, a `testnet` command which tests the internet connectivity using ping and a `size` command which gets the size of a file/folder
+, a `testnet` command which tests the internet connectivity using ping, a `size` command which gets the size of a file/folder and a `mchhelp` command
 - **AutoExec**: Custom `autoexec.mch` file with instructions (like .bat)
 - **MCH format**: 'Custom' executable format launchable with smch (.bat undercover)
 

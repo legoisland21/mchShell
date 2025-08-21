@@ -6,10 +6,19 @@
 #include <fstream>
 using namespace std;
 
-vector<string> blockedCommands = {"help", "ff"};
-vector<string> customCommands = {"ff"};
+vector<string> blockedCommands = {"help", "ff", "testnet", "pwd", "size", "mchhelp", "find"};
+vector<string> customCommands = {"ff", "testnet", "pwd", "size", "mchhelp", "find"};
 
 // Custom commands
+
+void mchHelp() {
+    cout << "mchhelp - displays info about custom commands" << endl;
+    cout << "testnet - checks internet connectivity" << endl;
+    cout << "pwd - shows current directory" << endl;
+    cout << "size <path> - shows size of file/folder" << endl;
+    cout << "ff <text> - finds file with beginning" << endl;
+    cout << "find <file> <string> - finds string in file" << endl;
+}
 
 void testNet() {
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -336,6 +345,8 @@ int main() {
         if (command == "testnet") { testNet(); continue; }
 
         if (command == "pwd") { cout << "Current path is: " << getPath() << endl; continue; }
+
+        if (command == "mchhelp") { mchHelp(); continue; }
 
         if (!checkApp(command, blockedCommands)) {
             system(command.c_str());
