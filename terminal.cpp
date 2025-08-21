@@ -13,45 +13,13 @@ vector<string> customCommands = {"ff"};
 
 void testNet() {
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    vector<string> sites = { "google.com", "yahoo.com", "example.com", "wikipedia.org", "bing.com" };
 
-    vector<string> sites = {
-        "google.com",
-        "yahoo.com",
-        "example.com",
-        "wikipedia.org",
-        "bing.com",
-        "duckduckgo.com"
-    };
-
-    for (const auto &site : sites) {
-        string cmd = "ping -n 1 " + site;
-        FILE* pipe = _popen(cmd.c_str(), "r");
-        if (!pipe) {
-            SetConsoleTextAttribute(hConsole, 12);
-            cout << "error pinging site: " << site << endl;
-            SetConsoleTextAttribute(hConsole, 7);
-            continue;
-        }
-
-        char buffer[128];
-        bool success = false;
-        while (fgets(buffer, sizeof(buffer), pipe)) {
-            string line(buffer);
-            if (line.find("TTL=") != string::npos) {
-                success = true;
-                break;
-            }
-        }
-
-        _pclose(pipe);
-
-        if (success) {
-            SetConsoleTextAttribute(hConsole, 10);
-            cout << site << " is reachable!" << endl;
-        } else {
-            SetConsoleTextAttribute(hConsole, 12);
-            cout << "error pinging site: " << site << endl;
-        }
+    for (auto &site : sites) {
+        string cmd = "ping -n 1 " + site + " >nul";
+        int res = system(cmd.c_str());
+        SetConsoleTextAttribute(hConsole, res == 0 ? 10 : 12);
+        cout << site << (res == 0 ? " is reachable" : " is unreachable") << endl;
         SetConsoleTextAttribute(hConsole, 7);
     }
 }
@@ -88,121 +56,69 @@ void findInFile(const string &filename, const string &search) {
     }
 }
 
-uint64_t getFileOrFolderSize(const string &path) {
-    WIN32_FIND_DATAA fd;
-    HANDLE hFind = INVALID_HANDLE_VALUE;
-    uint64_t totalSize = 0;
-
-    string searchPath = path + "\\*";
-
-    hFind = FindFirstFileA(searchPath.c_str(), &fd);
-    if (hFind == INVALID_HANDLE_VALUE) {
-        WIN32_FILE_ATTRIBUTE_DATA fileInfo;
-        if (GetFileAttributesExA(path.c_str(), GetFileExInfoStandard, &fileInfo)) {
-            LARGE_INTEGER size;
-            size.LowPart = fileInfo.nFileSizeLow;
-            size.HighPart = fileInfo.nFileSizeHigh;
-            return size.QuadPart;
-        }
-        cerr << "Cannot access: " << path << endl;
-        return 0;
+ULONGLONG getFileOrFolderSize(const string &path) {
+    WIN32_FILE_ATTRIBUTE_DATA fad;
+    if (GetFileAttributesExA(path.c_str(), GetFileExInfoStandard, &fad)) {
+        if (fad.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            ULONGLONG size = 0;
+            WIN32_FIND_DATAA fd;
+            HANDLE hFind = FindFirstFileA((path + "\\*").c_str(), &fd);
+            if (hFind == INVALID_HANDLE_VALUE) return 0;
+            do {
+                string name = fd.cFileName;
+                if (name != "." && name != "..")
+                    size += getFileOrFolderSize(path + "\\" + name);
+            } while (FindNextFileA(hFind, &fd));
+            FindClose(hFind);
+            return size;
+        } else
+            return ((ULONGLONG)fad.nFileSizeHigh << 32) + fad.nFileSizeLow;
     }
-
-    do {
-        string name = fd.cFileName;
-        if (name == "." || name == "..") continue;
-
-        string fullPath = path + "\\" + name;
-
-        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            totalSize += getFileOrFolderSize(fullPath);
-        } else {
-            LARGE_INTEGER size;
-            size.LowPart = fd.nFileSizeLow;
-            size.HighPart = fd.nFileSizeHigh;
-            totalSize += size.QuadPart;
-        }
-    } while (FindNextFileA(hFind, &fd) != 0);
-
-    FindClose(hFind);
-    return totalSize;
+    return 0;
 }
 
-void findFilesAndFolders(const string& searchTerm) {
+void findFilesAndFolders(const string& term) {
     WIN32_FIND_DATAA fd;
-    HANDLE hFind = FindFirstFileA("*", &fd);
+    HANDLE h = FindFirstFileA("*", &fd);
+    if (h == INVALID_HANDLE_VALUE) { cout << "Nothing found\n"; return; }
 
-    if (hFind == INVALID_HANDLE_VALUE) {
-        cout << "Nothing found" << endl;
-        return;
-    }
-
-    vector<string> files;
-    vector<string> folders;
-
+    string files, folders;
     do {
-        string name = fd.cFileName;
-
-        if (name == "." || name == "..") continue;
-        
-        if (name.substr(0, searchTerm.size()) == searchTerm) {
+        string n = fd.cFileName;
+        if (n == "." || n == "..") continue;
+        if (n.substr(0, term.size()) == term) {
             if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-                folders.push_back(name);
+                folders += n + " ";
             else
-                files.push_back(name);
+                files += n + " ";
         }
-    } while (FindNextFileA(hFind, &fd));
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
 
-    FindClose(hFind);
-
-    if (!files.empty()) {
-        cout << "FILES:" << endl;
-        for (auto &f : files) cout << f << " ";
-        cout << endl;
-    }
-
-    if (!folders.empty()) {
-        cout << "FOLDERS:" << endl;
-        for (auto &d : folders) cout << d << " ";
-        cout << endl;
-    }
-
-    if (files.empty() && folders.empty())
-        cout << "No files/folders found" << endl;
+    if (!files.empty()) cout << "FILES\n" << files << "\n";
+    if (!folders.empty()) cout << "FOLDERS\n" << folders << "\n";
+    if (files.empty() && folders.empty()) cout << "No files/folders found\n";
 }
 
 // Environment Variable handler
 
 string getEnvironmentVariable(const string& name) {
-    char buffer[1024];
-    DWORD result = GetEnvironmentVariableA(name.c_str(), buffer, sizeof(buffer));
-    
-    if (result == 0) return "";
-    else if (result > sizeof(buffer)) {
-        vector<char> largeBuffer(result);
-        GetEnvironmentVariableA(name.c_str(), largeBuffer.data(), result);
-        return string(largeBuffer.data());
-    }
-    
-    return string(buffer);
+    char buf[1024];
+    DWORD sz = GetEnvironmentVariableA(name.c_str(), buf, sizeof(buf));
+    if (sz == 0) return "";
+    if (sz > sizeof(buf)) { vector<char> b(sz); GetEnvironmentVariableA(name.c_str(), b.data(), sz); return string(b.data()); }
+    return string(buf);
 }
 
 string expandEnvironmentVariables(const string& input) {
-    string result = input;
-    size_t startPos = 0;
-    
-    while ((startPos = result.find('%', startPos)) != string::npos) {
-        size_t endPos = result.find('%', startPos + 1);
-        if (endPos == string::npos) break;
-        
-        string varName = result.substr(startPos + 1, endPos - startPos - 1);
-        string varValue = getEnvironmentVariable(varName);
-        
-        if (!varValue.empty()) { result.replace(startPos, endPos - startPos + 1, varValue); startPos += varValue.length(); } 
-        else startPos = endPos + 1;
+    string r = input; size_t pos = 0;
+    while ((pos = r.find('%', pos)) != string::npos) {
+        size_t end = r.find('%', pos+1);
+        if (end == string::npos) break;
+        string val = getEnvironmentVariable(r.substr(pos+1, end-pos-1));
+        r.replace(pos, end-pos+1, val); pos += val.size();
     }
-    
-    return result;
+    return r;
 }
 
 // Command handling
@@ -415,20 +331,11 @@ int main() {
             continue;
         }
 
-        if (command.substr(0, 5) == "smch ") {
-            runMCH(command.substr(5));
-            continue;
-        }
+        if (command.substr(0, 5) == "smch ") { runMCH(command.substr(5)); continue; }
 
-        if (command == "testnet") {
-            testNet();
-            continue;
-        }
+        if (command == "testnet") { testNet(); continue; }
 
-        if (command == "pwd") {
-            cout << "Current path is: " << getPath() << endl; 
-            continue;
-        }
+        if (command == "pwd") { cout << "Current path is: " << getPath() << endl; continue; }
 
         if (!checkApp(command, blockedCommands)) {
             system(command.c_str());
